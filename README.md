@@ -6,7 +6,7 @@
 #### PS: This project is not maintained anymore.
 
 ## Features
--  Implements JWT for secure voter authentication and authorization.
+-  Implements JWT for sehhcchchhcure voter authentication and authorization.
 -  Utilizes Ethereum blockchain for tamper-proof and transparent voting records.
 -  Removes the need for intermediaries, ensuring a trustless voting process.
 -  Admin panel to manage candidates, set voting dates, and monitor results.
