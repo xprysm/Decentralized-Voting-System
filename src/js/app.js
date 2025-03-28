@@ -1,104 +1,102 @@
-//import "../css/style.css"
-
 const Web3 = require('web3');
 const contract = require('@truffle/contract');
-
 const votingArtifacts = require('../../build/contracts/Voting.json');
-var VotingContract = contract(votingArtifacts)
-
+var VotingContract = contract(votingArtifacts);
 
 window.App = {
-  eventStart: function() { 
-    window.ethereum.request({ method: 'eth_requestAccounts' });
-    VotingContract.setProvider(window.ethereum)
-    VotingContract.defaults({from: window.ethereum.selectedAddress,gas:6654755})
+  eventStart: async function () {
+    if (window.ethereum) {
+      await window.ethereum.request({ method: 'eth_requestAccounts' });
+      const web3 = new Web3(window.ethereum);
+      VotingContract.setProvider(window.ethereum);
 
-    // Load account data
-    App.account = window.ethereum.selectedAddress;
-    $("#accountAddress").html("Your Account: " + window.ethereum.selectedAddress);
-    VotingContract.deployed().then(function(instance){
-     instance.getCountCandidates().then(function(countCandidates){
+      const accounts = await web3.eth.getAccounts();
+      App.account = accounts[0];
 
-            $(document).ready(function(){
-              $('#addCandidate').click(function() {
-                  var nameCandidate = $('#name').val();
-                  var partyCandidate = $('#party').val();
-                 instance.addCandidate(nameCandidate,partyCandidate).then(function(result){ })
+      VotingContract.defaults({ from: App.account, gas: 6654755 });
+      $("#accountAddress").html("Your Account: " + App.account);
 
-            });   
-              $('#addDate').click(function(){             
-                  var startDate = Date.parse(document.getElementById("startDate").value)/1000;
+      const instance = await VotingContract.deployed();
+      const countCandidates = await instance.getCountCandidates();
 
-                  var endDate =  Date.parse(document.getElementById("endDate").value)/1000;
-           
-                  instance.setDates(startDate,endDate).then(function(rslt){ 
-                    console.log("tarihler verildi");
-                  });
+      $(document).ready(function () {
+        $('#addCandidate').click(async function () {
+          const nameCandidate = $('#name').val();
+          const partyCandidate = $('#party').val();
+          await instance.addCandidate(nameCandidate, partyCandidate, { from: App.account });
+        });
 
-              });     
+        $('#addDate').click(async function () {
+          const startDate = Date.parse(document.getElementById("startDate").value) / 1000;
+          const endDate = Date.parse(document.getElementById("endDate").value) / 1000;
+          await instance.setDates(startDate, endDate, { from: App.account });
+          console.log("Dates set successfully");
+        });
 
-               instance.getDates().then(function(result){
-                var startDate = new Date(result[0]*1000);
-                var endDate = new Date(result[1]*1000);
-
-                $("#dates").text( startDate.toDateString(("#DD#/#MM#/#YYYY#")) + " - " + endDate.toDateString("#DD#/#MM#/#YYYY#"));
-              }).catch(function(err){ 
-                console.error("ERROR! " + err.message)
-              });           
-          });
-             
-          for (var i = 0; i < countCandidates; i++ ){
-            instance.getCandidate(i+1).then(function(data){
-              var id = data[0];
-              var name = data[1];
-              var party = data[2];
-              var voteCount = data[3];
-              var viewCandidates = `<tr><td> <input class="form-check-input" type="radio" name="candidate" value="${id}" id=${id}>` + name + "</td><td>" + party + "</td><td>" + voteCount + "</td></tr>"
-              $("#boxCandidate").append(viewCandidates)
-            })
-        }
-        
-        window.countCandidates = countCandidates 
+        instance.getDates().then(function (result) {
+          const startDate = new Date(result[0] * 1000);
+          const endDate = new Date(result[1] * 1000);
+          $("#dates").text(startDate.toDateString() + " - " + endDate.toDateString());
+        }).catch(err => console.error("ERROR! " + err.message));
       });
+
+      for (let i = 0; i < countCandidates; i++) {
+        instance.getCandidate(i + 1).then(function (data) {
+          const id = data[0];
+          const name = data[1];
+          const party = data[2];
+          const voteCount = data[3];
+          const viewCandidates = `
+            <tr>
+              <td><input class="form-check-input" type="radio" name="candidate" value="${id}" id=${id}> ${name}</td>
+              <td>${party}</td>
+              <td>${voteCount}</td>
+            </tr>`;
+          $("#boxCandidate").append(viewCandidates);
+        });
+      }
 
       instance.checkVote().then(function (voted) {
-          console.log(voted);
-          if(!voted)  {
-            $("#voteButton").attr("disabled", false);
-
-          }
+        if (!voted) {
+          $("#voteButton").attr("disabled", false);
+        }
       });
 
-    }).catch(function(err){ 
-      console.error("ERROR! " + err.message)
-    })
+    } else {
+      alert("Please install MetaMask!");
+    }
   },
 
-  vote: function() {    
-    var candidateID = $("input[name='candidate']:checked").val();
+  vote: async function () {
+    const candidateID = $("input[name='candidate']:checked").val();
     if (!candidateID) {
-      $("#msg").html("<p>Please vote for a candidate.</p>")
-      return
+      $("#msg").html("<p>Please vote for a candidate.</p>");
+      return;
     }
-    VotingContract.deployed().then(function(instance){
-      instance.vote(parseInt(candidateID)).then(function(result){
-        $("#voteButton").attr("disabled", true);
-        $("#msg").html("<p>Voted</p>");
-         window.location.reload(1);
-      })
-    }).catch(function(err){ 
-      console.error("ERROR! " + err.message)
-    })
-  }
-}
 
-window.addEventListener("load", function() {
-  if (typeof web3 !== "undefined") {
-    console.warn("Using web3 detected from external source like Metamask")
-    window.eth = new Web3(window.ethereum)
-  } else {
-    console.warn("No web3 detected. Falling back to http://localhost:9545. You should remove this fallback when you deploy live, as it's inherently insecure. Consider switching to Metamask for deployment. More info here: http://truffleframework.com/tutorials/truffle-and-metamask")
-    window.eth = new Web3(new Web3.providers.HttpProvider("http://127.0.0.1:9545"))
+    console.log("Voting for candidate:", candidateID, "from:", App.account);
+
+    try {
+      const instance = await VotingContract.deployed();
+      await instance.vote(parseInt(candidateID), { from: App.account });
+
+      $("#voteButton").attr("disabled", true);
+      $("#msg").html("<p>Voted</p>");
+      window.location.reload(1);
+    } catch (err) {
+      console.error("Vote error:", err);
+      $("#msg").html(`<p style="color:red;">Vote failed: ${err.message}</p>`);
+    }
   }
-  window.App.eventStart()
-})
+};
+
+window.addEventListener("load", function () {
+  if (typeof web3 !== "undefined") {
+    console.warn("Using web3 from MetaMask");
+    window.eth = new Web3(window.ethereum);
+  } else {
+    console.warn("No web3 detected. Falling back to http://localhost:9545");
+    window.eth = new Web3(new Web3.providers.HttpProvider("http://127.0.0.1:9545"));
+  }
+  window.App.eventStart();
+});
